@@ -4,9 +4,11 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  # NEXT_PUBLIC_* values are inlined into the browser bundle by Next.js on purpose (the Supabase anon key is
-  # public by design), so the secrets scanner must not fail the build on them. Never add a server-only key here.
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  # Values the secrets scanner must not fail the build on because they are public or plain words:
+  #   NEXT_PUBLIC_* are inlined into the browser bundle by Next.js on purpose (the Supabase anon key is public
+  #   by design); JOB_EXECUTION_MODE is the word "netlify" and appears in config and source.
+  # Never add a real credential (service-role key, signing secret, Azure/Foundry secrets) here.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,JOB_EXECUTION_MODE"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
