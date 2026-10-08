@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  directory = "netlify/functions-dist"
+  included_files = [
+    "node_modules/sharp/**",
+    "node_modules/@img/**",
+    "node_modules/detect-libc/**",
+    "node_modules/semver/**",
+    "node_modules/color/**",
+    "node_modules/color-convert/**",
+    "node_modules/color-name/**",
+    "node_modules/color-string/**",
+    "node_modules/simple-swizzle/**",
+    "node_modules/is-arrayish/**",
+  ]
+
+# Functions are written in netlify/functions/*.ts and bundled to netlify/functions-dist by `npm run build:functions`.
+# Schedules are declared in code (see reap-stale-jobs.ts).

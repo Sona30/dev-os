@@ -1,0 +1,31 @@
+{
+  "dataConfidence": "medium",
+  "summary": "Your child is building early number skills and is doing well with measurement. The next worksheet will check the places that look hardest.",
+  "gaps": [
+    {
+      "domain": "Number & Operations",
+      "skillId": "G1.NO.02",
+      "skillName": "Add within 20",
+      "evidence": "The overall placement is Early Grade 1, which usually means addition within 20 is still developing.",
+      "gapLevel": "moderate",
+      "priority": 1,
+      "suggestedMathLevel": 2,
+      "likely": true
+    },
+    {
+      "domain": "Algebra & Algebraic Thinking",
+      "skillId": "G1.AAT.01",
+      "skillName": "Missing addend",
+      "evidence": "Algebraic thinking is one step behind number skills in this result.",
+      "gapLevel": "small",
+      "priority": 2,
+      "suggestedMathLevel": 2,
+      "likely": true
+    }
+  ],
+  "strengths": [{ "skillId": "G1.MD.01", "note": "Comparing lengths looks secure." }],
+  "recommendations": ["Start with short addition stories within 20, then missing-number problems."],
+  "unmapped": [],
+  "estimatedReadingBand": null,
+  "flags": []
+}

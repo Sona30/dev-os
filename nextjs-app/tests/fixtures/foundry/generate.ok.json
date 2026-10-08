@@ -1,0 +1,45 @@
+{
+  "items": [
+    {
+      "position": 1,
+      "skillId": "G1.NO.02",
+      "domain": "Number & Operations",
+      "mathLevel": 2,
+      "readingBand": "R1",
+      "pairId": "P1",
+      "isStretch": false,
+      "isReadingProbe": false,
+      "structure": "join",
+      "context": "park",
+      "numberSet": [4, 3],
+      "questionText": "Mia has 4 ducks and gets 3 more. How many now?",
+      "answerType": "integer",
+      "correctAnswer": "7",
+      "acceptedAnswers": ["seven"],
+      "working": "4 + 3 = 7",
+      "verification": { "expression": "4 + 3", "expected": "7", "passed": true, "method": "code_interpreter" },
+      "ambiguous": false
+    },
+    {
+      "position": 2,
+      "skillId": "G1.NO.02",
+      "domain": "Number & Operations",
+      "mathLevel": 2,
+      "readingBand": "R2",
+      "pairId": "P1",
+      "isStretch": false,
+      "isReadingProbe": false,
+      "structure": "join",
+      "context": "bus stop",
+      "numberSet": [5, 3],
+      "questionText": "Omar has 5 cars. Omar gets 3 more. How many now?",
+      "answerType": "integer",
+      "correctAnswer": "8",
+      "acceptedAnswers": ["eight"],
+      "working": "5 + 3 = 8",
+      "verification": { "expression": "5 + 3", "expected": "8", "passed": true, "method": "code_interpreter" },
+      "ambiguous": false
+    }
+  ],
+  "flags": []
+}

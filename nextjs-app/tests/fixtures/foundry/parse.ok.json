@@ -1,0 +1,13 @@
+{
+  "status": "ok",
+  "rejectReason": null,
+  "window": "BOY",
+  "overallScore": 412,
+  "placement": "Early Grade 1",
+  "domains": [
+    { "domain": "Number & Operations", "placement": "Early Grade 1", "score": null },
+    { "domain": "Algebra & Algebraic Thinking", "placement": "Mid Grade 1", "score": null }
+  ],
+  "confidence": { "window": 0.95, "overallScore": 0.9, "placement": 0.95, "domains": 0.8 },
+  "flags": []
+}

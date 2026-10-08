@@ -1,0 +1,42 @@
+[
+  {
+    "skillId": "G1.NO.01", "grade": 1, "domain": "Number & Operations", "name": "Count and read numbers to 120",
+    "prerequisites": [],
+    "levels": { "M1": "Counts to 20 with objects", "M2": "Counts and reads numbers to 50", "M3": "Counts and reads numbers to 120", "M4": "Counts on from any number to 120" }
+  },
+  {
+    "skillId": "G1.NO.02", "grade": 1, "domain": "Number & Operations", "name": "Add within 20",
+    "prerequisites": ["G1.NO.01"],
+    "levels": { "M1": "Adds within 10 with pictures", "M2": "Adds within 10", "M3": "Adds within 20", "M4": "Adds three numbers within 20" }
+  },
+  {
+    "skillId": "G1.NO.03", "grade": 1, "domain": "Number & Operations", "name": "Subtract within 20",
+    "prerequisites": ["G1.NO.02"],
+    "levels": { "M1": "Subtracts within 10 with pictures", "M2": "Subtracts within 10", "M3": "Subtracts within 20", "M4": "Chooses add or subtract in a story within 20" }
+  },
+  {
+    "skillId": "G1.AAT.01", "grade": 1, "domain": "Algebra & Algebraic Thinking", "name": "Find the missing number in an equation",
+    "prerequisites": ["G1.NO.02"],
+    "levels": { "M1": "Finds a missing number within 5", "M2": "Finds a missing number within 10", "M3": "Finds a missing addend within 20", "M4": "Finds a missing number in subtraction within 20" }
+  },
+  {
+    "skillId": "G1.MD.01", "grade": 1, "domain": "Measurement & Data", "name": "Compare lengths of objects",
+    "prerequisites": [],
+    "levels": { "M1": "Says which of two objects is longer", "M2": "Orders three objects by length", "M3": "Measures with non-standard units", "M4": "Compares measurements in a story" }
+  },
+  {
+    "skillId": "G1.GEO.01", "grade": 1, "domain": "Geometry", "name": "Name and sort 2D shapes",
+    "prerequisites": [],
+    "levels": { "M1": "Names a circle, square and triangle", "M2": "Names rectangles and hexagons", "M3": "Sorts shapes by their sides", "M4": "Builds new shapes from smaller ones" }
+  },
+  {
+    "skillId": "G2.NO.01", "grade": 2, "domain": "Number & Operations", "name": "Add and subtract within 100",
+    "prerequisites": ["G1.NO.03"],
+    "levels": { "M1": "Adds and subtracts tens", "M2": "Adds within 100 without regrouping", "M3": "Adds and subtracts within 100 with regrouping", "M4": "Solves multi-step stories within 100" }
+  },
+  {
+    "skillId": "G2.AAT.01", "grade": 2, "domain": "Algebra & Algebraic Thinking", "name": "Solve two-step word problems",
+    "prerequisites": ["G2.NO.01"],
+    "levels": { "M1": "Solves one-step stories within 20", "M2": "Solves one-step stories within 100", "M3": "Solves two-step stories within 100", "M4": "Writes an equation for a two-step story" }
+  }
+]

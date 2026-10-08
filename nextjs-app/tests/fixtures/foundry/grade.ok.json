@@ -1,0 +1,28 @@
+{
+  "sheetId": "TR-Maya-C1-AB12",
+  "sheetIdConfidence": 0.95,
+  "qualityAssessment": "good",
+  "items": [
+    {
+      "position": 1,
+      "extractedAnswer": "7",
+      "extractionConfidence": 0.97,
+      "boundingBox": { "x": 0.52, "y": 0.18, "w": 0.2, "h": 0.06, "page": 1 },
+      "status": "correct",
+      "errorType": null,
+      "methodEvidence": "Drew 4 and 3 dots and counted all.",
+      "methodSound": true
+    },
+    {
+      "position": 2,
+      "extractedAnswer": "12",
+      "extractionConfidence": 0.62,
+      "boundingBox": { "x": 0.52, "y": 0.42, "w": 0.2, "h": 0.06, "page": 1 },
+      "status": "incorrect",
+      "errorType": "unclear",
+      "methodEvidence": "No working shown; the digits could be 12 or 17.",
+      "methodSound": null
+    }
+  ],
+  "flags": []
+}

@@ -1,0 +1,10 @@
+{
+  "status": "rejected_input",
+  "rejectReason": "This looks like a Reading report, not a Math report.",
+  "window": null,
+  "overallScore": null,
+  "placement": null,
+  "domains": [],
+  "confidence": { "window": 0, "overallScore": 0, "placement": 0, "domains": 0 },
+  "flags": ["wrong_subject"]
+}
