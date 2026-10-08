@@ -4,11 +4,12 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  # Values the secrets scanner must not fail the build on because they are public or plain words:
-  #   NEXT_PUBLIC_* are inlined into the browser bundle by Next.js on purpose (the Supabase anon key is public
-  #   by design); JOB_EXECUTION_MODE is the word "netlify" and appears in config and source.
-  # Never add a real credential (service-role key, signing secret, Azure/Foundry secrets) here.
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,JOB_EXECUTION_MODE"
+  # Settings the secrets scanner must not fail the build on: public values (NEXT_PUBLIC_* are inlined into the
+  # browser bundle by Next.js on purpose; the Supabase anon and Stripe publishable keys are public by design)
+  # and plain config words or numbers (bucket names, modes, flags, limits, model names) that appear in source.
+  # NEVER add a real credential here: service-role key, JOB_SIGNING_SECRET, CRON_SECRET, Azure/Foundry
+  # secrets, Stripe secret/webhook keys, email API key, webhook URLs, E2E passwords.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SUPPORT_EMAIL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,NEXT_PUBLIC_ANALYTICS_KEY,SUPABASE_STORAGE_UPLOADS_BUCKET,SUPABASE_STORAGE_WORKSHEETS_BUCKET,APP_ENV,LOG_LEVEL,JOB_EXECUTION_MODE,JOB_MAX_RUNTIME_MINUTES,JOB_MAX_CONCURRENT_PER_USER,FOUNDRY_MOCK,FOUNDRY_API_VERSION,FOUNDRY_API_TIMEOUT_MS,FOUNDRY_MODEL_DEPLOYMENT,FOUNDRY_GRADER_DEPLOYMENT,FOUNDRY_PRICE_INPUT_PER_1M_USD,FOUNDRY_PRICE_OUTPUT_PER_1M_USD,FOUNDRY_CODE_INTERPRETER_SESSION_USD,EXTRACTION_CONFIDENCE_THRESHOLD,MAX_UPLOAD_BYTES,UPLOAD_RETENTION_DAYS,SIGNED_URL_TTL_SECONDS,DAILY_CYCLE_CAP_DEFAULT,RATE_LIMIT_ENABLED,DISABLE_SIGNED_URLS,MONTHLY_BUDGET_USD,COST_PER_CYCLE_ALERT_USD,OVERRIDE_RATE_ALERT"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
