@@ -15,8 +15,11 @@ export interface BandRules {
   maxNameSyllables?: number
 }
 
+// R1 allows up to three sentences because a word problem needs a setup, an action and a question, and the words
+// per sentence (not the sentence count) are what make a text hard for a new reader: three four-word sentences are
+// easier than one nine-word sentence.
 export const BAND_RULES: Record<ReadingBand, BandRules> = {
-  R1: { minSentences: 1, maxSentences: 2, maxWordsPerSentence: 8, maxLongWordRatio: 0, maxNameSyllables: 2 },
+  R1: { minSentences: 1, maxSentences: 3, maxWordsPerSentence: 8, maxLongWordRatio: 0, maxNameSyllables: 2 },
   R2: { minSentences: 2, maxSentences: 3, maxWordsPerSentence: 10, maxLongWordRatio: 0.1 },
   R3: { minSentences: 3, maxSentences: 4, maxWordsPerSentence: 14, maxLongWordRatio: 0.2 },
   R4: { minSentences: 2, maxSentences: 5, maxWordsPerSentence: 16, maxLongWordRatio: 0.3 },
@@ -25,7 +28,7 @@ export const BAND_RULES: Record<ReadingBand, BandRules> = {
 /** The gentlest R1 template, used for the "low reading" half of a diagnostic pair when the child is already R1. */
 export const R1_MINIMAL_RULES: BandRules = {
   minSentences: 1,
-  maxSentences: 2,
+  maxSentences: 3,
   maxWordsPerSentence: 6,
   maxLongWordRatio: 0,
   maxNameSyllables: 2,
@@ -45,7 +48,7 @@ export function checkReadability(text: string, band: ReadingBand, minimal = fals
     reasons.push(
       `Has ${sentences.length} sentences; ${band}${minimal ? ' (minimal)' : ''} needs ${rules.minSentences}-${rules.maxSentences}.` +
         (sentences.length > rules.maxSentences
-          ? ' Join the setup and the action into one sentence with "and", keeping the question as the last sentence.'
+          ? ' Combine short sentences if you can, but keep every sentence within the word limit and the question last.'
           : ''),
     )
   }
@@ -58,7 +61,7 @@ export function checkReadability(text: string, band: ReadingBand, minimal = fals
   }
 
   const candidateWords = words(text).filter(
-    (word) => /^[A-Za-z]+$/.test(word) && !isKnownName(word) && !isNumberWord(word),
+    (word) => /^[A-Za-z]+$/.test(word) && !isKnownName(word) && !isNumberWord(word) && !MATH_TERMS.has(word.toLowerCase()),
   )
   if (candidateWords.length > 0) {
     const longWords = candidateWords.filter((word) => countSyllables(word) >= 3)
@@ -73,6 +76,13 @@ export function checkReadability(text: string, band: ReadingBand, minimal = fals
   }
   return reasons
 }
+
+// Grade 1-2 math vocabulary that a problem cannot avoid, so it does not count as a "long word" for the band.
+const MATH_TERMS = new Set([
+  'rectangle', 'rectangles', 'triangle', 'triangles', 'hexagon', 'hexagons', 'trapezoid', 'trapezoids', 'cylinder',
+  'cylinders', 'quadrilateral', 'quadrilaterals', 'centimeter', 'centimeters', 'subtract', 'subtraction', 'addition',
+  'equation', 'equal', 'equals', 'fraction', 'fractions', 'measure', 'measures',
+])
 
 function isNumberWord(word: string): boolean {
   const lower = word.toLowerCase()

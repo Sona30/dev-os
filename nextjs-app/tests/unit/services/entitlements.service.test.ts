@@ -37,6 +37,27 @@ describe('assertCanStartCycle', () => {
     await expect(assertCanStartCycle(setup(subscription({ free_cycle_used: true })), 'u1', 'c1')).rejects.toMatchObject({ code: 'PAYWALL' })
   })
 
+  it('lets a free user who has used the free cycle carry on when DISABLE_FREE_LIMIT is true', async () => {
+    process.env.DISABLE_FREE_LIMIT = 'true'
+    try {
+      await expect(assertCanStartCycle(setup(subscription({ free_cycle_used: true })), 'u1', 'c1')).resolves.toBeUndefined()
+      const result = await getEntitlements(setup(subscription({ free_cycle_used: true })), 'u1')
+      expect(result).toMatchObject({ canStartCycle: true, freeCycleUsed: true })
+    } finally {
+      delete process.env.DISABLE_FREE_LIMIT
+    }
+  })
+
+  it('still enforces the daily cap when DISABLE_FREE_LIMIT is true', async () => {
+    process.env.DISABLE_FREE_LIMIT = 'true'
+    try {
+      const capped = subscription({ free_cycle_used: true, daily_cycle_cap: 3 })
+      await expect(assertCanStartCycle(setup(capped, 3), 'u1', 'c1')).rejects.toMatchObject({ code: 'DAILY_CAP' })
+    } finally {
+      delete process.env.DISABLE_FREE_LIMIT
+    }
+  })
+
   it('treats a lapsed paid plan like the free plan', async () => {
     const lapsed = subscription({ plan: 'family', status: 'active', free_cycle_used: true, current_period_end: '2020-01-01T00:00:00Z' })
     await expect(assertCanStartCycle(setup(lapsed), 'u1', 'c1')).rejects.toMatchObject({ code: 'PAYWALL' })

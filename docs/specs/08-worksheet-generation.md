@@ -74,7 +74,7 @@ Progress mapping: planner 10–25, pass 1 55, verification 75, PDFs 90.
 ### 4.4 Readability bands (`src/lib/worksheets/bands.ts`)
 | Band | Sentences | Words/sentence (max) | Other constraints |
 |---|---|---|---|
-| R1 | 1–2 | 8 | sight-word vocabulary list; names ≤ 2 syllables; no irrelevant detail |
+| R1 | 1–3 | 8 | sight-word vocabulary list; names ≤ 2 syllables; no irrelevant detail |
 | R2 | 2–3 | 10 | simple tense; one idea per sentence |
 | R3 | 3–4 | 14 | one irrelevant detail allowed |
 | R4 | up to 5 | 16 | up to two irrelevant details; multi-step setup |

@@ -72,6 +72,14 @@ async function childIdsOf(userId: string): Promise<string[]> {
   return ((data ?? []) as Array<{ id: string }>).map((row) => row.id)
 }
 
+/**
+ * Testing switch: with DISABLE_FREE_LIMIT=true a free account is not stopped after its one free worksheet.
+ * The daily cap still applies. Leave it unset (or false) before real users arrive.
+ */
+function freeLimitDisabled(): boolean {
+  return process.env.DISABLE_FREE_LIMIT === 'true'
+}
+
 function isPaidAndCurrent(subscription: SubscriptionRow): boolean {
   if (subscription.plan === 'free' || subscription.status !== 'active') return false
   return !subscription.current_period_end || new Date(subscription.current_period_end).getTime() > Date.now()
@@ -92,7 +100,7 @@ async function evaluate(
   let reason: BlockReason | undefined
   if (!isPaidAndCurrent(subscription)) {
     // Free plan, or a paid plan that has lapsed: only the single free cycle is available.
-    if (subscription.free_cycle_used) reason = 'PAYWALL'
+    if (subscription.free_cycle_used && !freeLimitDisabled()) reason = 'PAYWALL'
   } else if (subscription.plan === 'season') {
     const periodEnd = subscription.current_period_end ? new Date(subscription.current_period_end).getTime() : Date.now()
     const periodStart = new Date(periodEnd - SEASON_WEEKS * WEEK_MS).toISOString()
