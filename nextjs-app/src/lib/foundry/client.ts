@@ -8,6 +8,7 @@ import { recordUsage } from '@/lib/usage/record'
 import { MODE_CONFIG } from './config'
 import { estimateCostUsd } from './cost'
 import { getFoundryEnv, isMockEnabled } from './env'
+import { applyGuards } from './guards'
 import { extractJson } from './json-extract'
 import { KB_VERSION } from './kb-version.generated'
 import { buildMessageParts, correctiveMessage } from './prompt'
@@ -101,8 +102,9 @@ export async function callAgent<M extends Mode>(request: FoundryRequest<M>): Pro
   }
   // Parent-typed fields are screened for prompt injection and the payload size is capped before any tokens
   // are spent (lib/security). Both throw AppErrors, which fail the job with a parent-safe message.
-  assertAgentInputSafe(parsedInput.data)
-  assertAgentInputSize(parsedInput.data)
+  const validInput = parsedInput.data
+  assertAgentInputSafe(validInput)
+  assertAgentInputSize(validInput)
   const images = request.images ?? []
   assertAgentImages(mode, images)
 
@@ -140,13 +142,15 @@ export async function callAgent<M extends Mode>(request: FoundryRequest<M>): Pro
     if (!extracted) return { ok: false, issues: 'No valid JSON block was found.' }
     const validated = OUTPUT_SCHEMAS[mode].safeParse(extracted.json)
     if (!validated.success) return { ok: false, issues: formatIssues(validated.error.issues) }
-    return { ok: true, data: validated.data as ModeOutputs[M], narrative: extracted.narrative }
+    const guarded = applyGuards(mode, validInput, validated.data as ModeOutputs[M])
+    if (guarded.corrections.length > 0) log.warn({ corrections: guarded.corrections }, 'agent output corrected by the app')
+    return { ok: true, data: guarded.data, narrative: extracted.narrative }
   }
 
   try {
     session = await openSession(mode, request.input)
 
-    let turn = await session.send(buildMessageParts(mode, parsedInput.data, images), options)
+    let turn = await session.send(buildMessageParts(mode, validInput, images), options)
     await account(turn)
     let outcome = interpret(turn.text)
 
