@@ -54,8 +54,8 @@ describe('Foundry Responses transport', () => {
     expect(url).toBe(`${ENDPOINT}/openai/v1/responses`)
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer test-token')
     const body = JSON.parse(String(init?.body))
-    expect(Object.keys(body).sort()).toEqual(['agent', 'input'])
-    expect(body.agent).toEqual({ name: 'TestReady1', type: 'agent_reference' })
+    expect(Object.keys(body).sort()).toEqual(['agent_reference', 'input'])
+    expect(body.agent_reference).toEqual({ name: 'TestReady1', type: 'agent_reference' })
     expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'hi' }] }])
   })
 

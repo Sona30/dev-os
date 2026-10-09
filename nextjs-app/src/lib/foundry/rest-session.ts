@@ -4,7 +4,7 @@ import { ContentBlockedError, TransientFoundryError, withTransportRetry } from '
 import type { AgentSession, MessagePart, ToolEvent, TurnOptions, TurnResult } from './types'
 
 // Talks to an Azure AI Foundry agent through the Responses API on the project endpoint:
-//   POST {project endpoint}/openai/v1/responses   with   agent: { name, type: "agent_reference" }
+//   POST {project endpoint}/openai/v1/responses   with   agent_reference: { name, type: "agent_reference" }
 // The agent owns its model, instructions (prompts/v1.0/system.md), tools and knowledge base, which are set in the
 // Foundry portal; a request that names an agent must not try to override them, so only `input` is sent.
 // Each session keeps its own message history and resends it, so nothing depends on server-side conversation state.
@@ -115,7 +115,7 @@ class RestSession implements AgentSession {
   private async createResponse(): Promise<ResponseObject> {
     const created = await this.request<ResponseObject>('POST', '/openai/v1/responses', {
       input: this.history,
-      agent: { name: this.env.agentName, type: 'agent_reference' },
+      agent_reference: { name: this.env.agentName, type: 'agent_reference' },
     })
 
     const deadline = Date.now() + this.env.timeoutMs
