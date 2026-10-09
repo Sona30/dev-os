@@ -34,6 +34,16 @@ const inputSchema = z
 const IMAGE_URL_TTL_SECONDS = 600
 const SHEET_ID_MIN_CONFIDENCE = 0.8
 const FALLBACK_CROP_MAX_CONFIDENCE = 0.5
+const CROP_CONCURRENCY = 4
+const CROP_TIMEOUT_MS = 25_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
 const AGENT_MIMES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
 interface KeyRow {
@@ -287,54 +297,71 @@ async function grade(ctx: JobContext): Promise<Record<string, unknown>> {
   const statusByRowId = new Map(judged.map((item) => [item.row.id, item.status]))
 
   // ---- Crop the doubtful answers for the review queue ----
-  const pageBuffers = new Map<number, Buffer>()
-  const loadPage = async (pageIndex: number): Promise<Buffer | null> => {
-    const cached = pageBuffers.get(pageIndex)
+  // Each page is downloaded once and shared by every crop that needs it. Crops run a few at a time and each has a
+  // time limit: the picture is a convenience (the parent can still type the answer), so a slow storage call must
+  // never hold up, or fail, the whole grading job.
+  const pagePromises = new Map<number, Promise<Buffer | null>>()
+  const loadPage = (pageIndex: number): Promise<Buffer | null> => {
+    const cached = pagePromises.get(pageIndex)
     if (cached) return cached
     const upload = uploads[pageIndex]
-    if (!upload) return null
-    const { data, error } = await service.storage.from('uploads').download(upload.storage_path)
-    if (error || !data) return null
-    const buffer = Buffer.from(await data.arrayBuffer())
-    pageBuffers.set(pageIndex, buffer)
-    return buffer
+    const pending = (async () => {
+      if (!upload) return null
+      const { data, error } = await service.storage.from('uploads').download(upload.storage_path)
+      if (error || !data) return null
+      return Buffer.from(await data.arrayBuffer())
+    })()
+    pagePromises.set(pageIndex, pending)
+    return pending
+  }
+  const pageIndexOf = (item: Judged) => Math.max(0, Math.min(uploads.length - 1, (item.box?.page ?? 1) - 1))
+
+  const cropForReview = async (item: Judged): Promise<string | null> => {
+    const page = await loadPage(pageIndexOf(item))
+    if (!page) return null
+    const box = item.box ?? fallbackBox(item.row.position, key.length)
+    const jpeg = await cropAnswer(page, box)
+    const cropId = randomUUID()
+    const cropPath = `${job.user_id}/${input.childId}/item_crop/${cropId}.jpg`
+    const { error: uploadCropError } = await service.storage
+      .from('uploads')
+      .upload(cropPath, jpeg, { contentType: 'image/jpeg', upsert: false })
+    if (uploadCropError) throw uploadCropError
+    const { error: rowError } = await service.from('uploads').insert({
+      id: cropId,
+      user_id: job.user_id,
+      child_id: input.childId,
+      kind: 'item_crop',
+      worksheet_id: input.worksheetId,
+      storage_path: cropPath,
+      mime: 'image/jpeg',
+      bytes: jpeg.length,
+      confirmed_uploaded: true,
+    })
+    if (rowError) throw rowError
+    return cropPath
+  }
+
+  const cropPaths = new Map<string, string | null>()
+  const toCrop = judged.filter((item) => item.flagged)
+  for (let first = 0; first < toCrop.length; first += CROP_CONCURRENCY) {
+    await Promise.all(
+      toCrop.slice(first, first + CROP_CONCURRENCY).map(async (item) => {
+        try {
+          cropPaths.set(item.row.id, await withTimeout(cropForReview(item), CROP_TIMEOUT_MS))
+        } catch (error) {
+          // The queue still works without the picture; the parent sees the extracted value and types the answer.
+          cropPaths.set(item.row.id, null)
+          log.warn({ err: error, position: item.row.position }, 'could not crop an answer for review')
+        }
+      }),
+    )
   }
 
   const rows: Array<Record<string, unknown> & { needs_review: boolean }> = []
   for (const item of judged) {
-    let cropPath: string | null = null
-    const pageIndex = Math.max(0, Math.min(uploads.length - 1, (item.box?.page ?? 1) - 1))
-    if (item.flagged) {
-      try {
-        const page = await loadPage(pageIndex)
-        if (page) {
-          const box = item.box ?? fallbackBox(item.row.position, key.length)
-          const jpeg = await cropAnswer(page, box)
-          const cropId = randomUUID()
-          cropPath = `${job.user_id}/${input.childId}/item_crop/${cropId}.jpg`
-          const { error: uploadCropError } = await service.storage
-            .from('uploads')
-            .upload(cropPath, jpeg, { contentType: 'image/jpeg', upsert: false })
-          if (uploadCropError) throw uploadCropError
-          const { error: rowError } = await service.from('uploads').insert({
-            id: cropId,
-            user_id: job.user_id,
-            child_id: input.childId,
-            kind: 'item_crop',
-            worksheet_id: input.worksheetId,
-            storage_path: cropPath,
-            mime: 'image/jpeg',
-            bytes: jpeg.length,
-            confirmed_uploaded: true,
-          })
-          if (rowError) throw rowError
-        }
-      } catch (error) {
-        // The queue still works without the picture; the parent sees the extracted value and types the answer.
-        cropPath = null
-        log.warn({ err: error, position: item.row.position }, 'could not crop an answer for review')
-      }
-    }
+    const pageIndex = pageIndexOf(item)
+    const cropPath = cropPaths.get(item.row.id) ?? null
 
     const partner = partnerOf(item.row)
     const errorType = refineErrorType({
