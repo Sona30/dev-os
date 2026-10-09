@@ -32,7 +32,7 @@ const inputSchema = z
   })
   .passthrough()
 
-const MAX_PASSES = 3
+const MAX_PASSES = 5
 const HISTORY_ROWS_FOR_CHECKS = 300
 const HISTORY_ROWS_FOR_MODEL = 40
 
@@ -262,6 +262,8 @@ async function generate(ctx: JobContext): Promise<Record<string, unknown>> {
   const planByPosition = new Map(plan.items.map((item) => [item.position, item]))
   const accepted = new Map<number, GeneratedItem>()
   let rework: Array<{ position: number; reasons: string[] }> | undefined
+  // The wording of each rejected item, shown back to the model so a rewrite edits it instead of repeating it.
+  const rejectedText = new Map<number, string>()
   let modelName = ''
   let promptVersion = ''
   let kbVersion = ''
@@ -297,15 +299,22 @@ async function generate(ctx: JobContext): Promise<Record<string, unknown>> {
         markUsed(used, item, false)
       } else {
         reasonsByPosition.set(item.position, reasons)
+        rejectedText.set(item.position, item.questionText)
       }
     }
 
     const missing = plan.items.filter((item) => !accepted.has(item.position))
     if (missing.length === 0) break
-    rework = missing.map((item) => ({
-      position: item.position,
-      reasons: reasonsByPosition.get(item.position) ?? ['No item was returned for this position.'],
-    }))
+    rework = missing.map((item) => {
+      const reasons = reasonsByPosition.get(item.position) ?? ['No item was returned for this position.']
+      const previous = rejectedText.get(item.position)
+      return {
+        position: item.position,
+        reasons: previous
+          ? [...reasons, `Your previous wording was: "${previous}". Edit it to fix the problems above; do not write it the same way again.`]
+          : reasons,
+      }
+    })
     log.info({ pass, rejected: missing.length }, 'some generated items failed checks')
   }
 

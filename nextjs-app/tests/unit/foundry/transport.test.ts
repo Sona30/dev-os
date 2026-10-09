@@ -97,6 +97,13 @@ describe('generateOutput verification.expected', () => {
     acceptedAnswers: [], working: '4 + 3 = 7',
     verification: { expression: '4 + 3', expected, passed: true, method: 'code_interpreter' }, ambiguous: false,
   })
+  it('treats a missing or non-boolean passed as not passed', () => {
+    const bad = (passed: unknown) => ({ ...item('7'), verification: { ...item('7').verification, passed } })
+    for (const given of [null, undefined, 'no', 0]) {
+      expect(generateOutput.parse({ items: [bad(given)], flags: [] }).items[0]?.verification.passed).toBe(false)
+    }
+    expect(generateOutput.parse({ items: [bad(true)], flags: [] }).items[0]?.verification.passed).toBe(true)
+  })
   it.each([[7, '7'], [true, 'true'], [null, ''], ['7', '7']])('reads %j as the string %j', (given, expected) => {
     const parsed = generateOutput.parse({ items: [item(given)], flags: [] })
     expect(parsed.items[0]?.verification.expected).toBe(expected)

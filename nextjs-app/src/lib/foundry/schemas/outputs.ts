@@ -74,7 +74,8 @@ export const generateOutput = z.object({
           expression: z.string().nullable(),
           // The model sometimes writes the computed value as a number or boolean; the app recomputes the answer itself.
           expected: z.preprocess((value) => (value === null || value === undefined ? '' : String(value)), z.string()),
-          passed: z.boolean(),
+          // A missing or non-boolean verdict counts as "not passed", so the item is rewritten instead of the call failing.
+          passed: z.preprocess((value) => value === true || value === 'true', z.boolean()),
           method: z.enum(['code_interpreter', 'reasoned']),
         }),
         ambiguous: z.boolean(),
