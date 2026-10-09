@@ -43,7 +43,10 @@ export function checkReadability(text: string, band: ReadingBand, minimal = fals
   const sentences = splitSentences(text)
   if (sentences.length < rules.minSentences || sentences.length > rules.maxSentences) {
     reasons.push(
-      `Has ${sentences.length} sentences; ${band}${minimal ? ' (minimal)' : ''} needs ${rules.minSentences}-${rules.maxSentences}.`,
+      `Has ${sentences.length} sentences; ${band}${minimal ? ' (minimal)' : ''} needs ${rules.minSentences}-${rules.maxSentences}.` +
+        (sentences.length > rules.maxSentences
+          ? ' Join the setup and the action into one sentence with "and", keeping the question as the last sentence.'
+          : ''),
     )
   }
   for (const sentence of sentences) {

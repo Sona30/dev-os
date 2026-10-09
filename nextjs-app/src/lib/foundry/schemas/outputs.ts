@@ -72,7 +72,8 @@ export const generateOutput = z.object({
         working: z.string(),
         verification: z.object({
           expression: z.string().nullable(),
-          expected: z.string(),
+          // The model sometimes writes the computed value as a number or boolean; the app recomputes the answer itself.
+          expected: z.preprocess((value) => (value === null || value === undefined ? '' : String(value)), z.string()),
           passed: z.boolean(),
           method: z.enum(['code_interpreter', 'reasoned']),
         }),

@@ -99,6 +99,39 @@ describe('checkItem', () => {
     expect(reasonsFor(withChanges({ numberSet: [4, 3, 9] })).join(' ')).toMatch(/number 9/)
   })
 
+  it('accepts an item with no numbers when the answer is not a whole number', () => {
+    const shapes = withChanges({
+      skillId: 'G1.GEO.01',
+      structure: 'identify',
+      context: 'blocks',
+      numberSet: [],
+      questionText: 'Ben has a ball and a box. Which one is shaped like a cube?',
+      answerType: 'text',
+      correctAnswer: 'the box',
+      acceptedAnswers: ['box'],
+      working: 'A box can be a cube.',
+      verification: { expression: null, expected: 'the box', passed: true, method: 'reasoned' },
+    })
+    const geometryPlan = { ...plan, skillId: 'G1.GEO.01' }
+    expect(checkItem(shapes, geometryPlan, emptyUsedKeys())).toEqual([])
+  })
+
+  it('still requires listed numbers for a whole-number answer', () => {
+    expect(reasonsFor(withChanges({ numberSet: [] })).join(' ')).toMatch(/List the numbers/)
+  })
+
+  it('tells the model to use an empty list when the problem has no numbers', () => {
+    expect(reasonsFor(withChanges({ numberSet: [0] })).join(' ')).toMatch(/use \[\]/)
+  })
+
+  it('does not treat two number-free items as the same numbers', () => {
+    const used = emptyUsedKeys()
+    markUsed(used, withChanges({ numberSet: [] }), false)
+    expect(used.numberSets.size).toBe(0)
+    const other = withChanges({ numberSet: [], answerType: 'text', correctAnswer: 'yes', acceptedAnswers: [] })
+    expect(checkItem(other, plan, used).join(' ')).not.toMatch(/numbers were used before/)
+  })
+
   it('rejects unsuitable scenarios', () => {
     expect(reasonsFor(withChanges({ context: 'a scary ghost' })).join(' ')).toMatch(/not suitable/)
   })

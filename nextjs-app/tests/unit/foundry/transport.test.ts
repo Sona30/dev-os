@@ -88,3 +88,17 @@ describe('output schemas', () => {
     expect(result.success).toBe(false)
   })
 })
+
+describe('generateOutput verification.expected', () => {
+  const item = (expected: unknown) => ({
+    position: 1, skillId: 'G1.NO.01', domain: 'Number & Operations', mathLevel: 2, readingBand: 'R2', pairId: null,
+    isStretch: false, isReadingProbe: false, structure: 'join', context: 'park', numberSet: [4, 3],
+    questionText: 'Mia sees 4 ducks. 3 more come. How many now?', answerType: 'integer', correctAnswer: '7',
+    acceptedAnswers: [], working: '4 + 3 = 7',
+    verification: { expression: '4 + 3', expected, passed: true, method: 'code_interpreter' }, ambiguous: false,
+  })
+  it.each([[7, '7'], [true, 'true'], [null, ''], ['7', '7']])('reads %j as the string %j', (given, expected) => {
+    const parsed = generateOutput.parse({ items: [item(given)], flags: [] })
+    expect(parsed.items[0]?.verification.expected).toBe(expected)
+  })
+})

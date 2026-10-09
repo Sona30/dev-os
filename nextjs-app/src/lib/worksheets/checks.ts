@@ -88,7 +88,7 @@ export function checkItem(item: GeneratedItem, plan: PlanItem, used: UsedKeys): 
       const computed = evaluateArithmetic(item.verification.expression)
       if (computed === null) reasons.push('The verification expression could not be evaluated.')
       else if (computed !== Number(item.correctAnswer)) {
-        reasons.push(`The expression evaluates to ${computed}, not ${item.correctAnswer}.`)
+        reasons.push(`The expression evaluates to ${computed}, not ${item.correctAnswer}. Write an expression that computes the answer itself (for example 10 - 7 for "how many more").`)
       }
     }
   }
@@ -101,9 +101,17 @@ export function checkItem(item: GeneratedItem, plan: PlanItem, used: UsedKeys): 
   if (item.correctAnswer.trim() === '') reasons.push('The correct answer is empty.')
 
   // 5. The numbers in numberSet must be the numbers in the problem; the problem must not give the answer away.
-  if (item.numberSet.length === 0) reasons.push('List the numbers used in the problem.')
+  // A whole-number answer always involves numbers. Shape, comparison and choice items may have none: for those
+  // an empty numberSet is correct.
+  if (item.numberSet.length === 0 && item.answerType === 'integer') {
+    reasons.push('List the numbers used in the problem.')
+  }
   const missing = item.numberSet.find((value) => !numberAppearsInText(value, item.questionText))
-  if (missing !== undefined) reasons.push(`The number ${missing} is in numberSet but not in the problem.`)
+  if (missing !== undefined) {
+    reasons.push(
+      `The number ${missing} is in numberSet but not printed in the problem text. numberSet must hold only the numbers shown in the text (never the answer or a total); use [] if the text has no numbers.`,
+    )
+  }
   if (leaksAnswer(item)) reasons.push('The problem text contains the answer.')
 
   // 6. Reading level and suitability.
@@ -115,7 +123,8 @@ export function checkItem(item: GeneratedItem, plan: PlanItem, used: UsedKeys): 
   // 7. Freshness: nothing repeated from the last four cycles or earlier on this sheet.
   const keys = keysOf(item)
   if (used.hashes.has(keys.hash)) reasons.push('This question was used before.')
-  if (used.numberSets.has(keys.numberSet)) reasons.push('These numbers were used before.')
+  // Items without numbers share the empty key, which says nothing about repetition; their wording is checked by hash.
+  if (keys.numberSet !== '' && used.numberSets.has(keys.numberSet)) reasons.push('These numbers were used before.')
   if (used.contextStructures.has(keys.contextStructure)) reasons.push('This scenario and structure were used before.')
 
   return reasons
@@ -124,7 +133,7 @@ export function checkItem(item: GeneratedItem, plan: PlanItem, used: UsedKeys): 
 export function markUsed(used: UsedKeys, item: GeneratedItem, includeContextStructure: boolean): void {
   const keys = keysOf(item)
   used.hashes.add(keys.hash)
-  used.numberSets.add(keys.numberSet)
+  if (keys.numberSet !== '') used.numberSets.add(keys.numberSet)
   // Within one sheet, the same scenario may legitimately appear twice (the two halves of a diagnostic pair).
   if (includeContextStructure) used.contextStructures.add(keys.contextStructure)
 }
