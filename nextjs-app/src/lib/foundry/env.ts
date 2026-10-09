@@ -1,34 +1,31 @@
-import { DEFAULT_API_VERSION, DEFAULT_TIMEOUT_MS } from './config'
+import { DEFAULT_TIMEOUT_MS } from './config'
 
 export interface FoundryEnv {
+  /** Project endpoint, e.g. https://<resource>.services.ai.azure.com/api/projects/<project>. */
   endpoint: string
-  agentId: string
+  /** Name of the agent in the Foundry portal; requests refer to it with an agent_reference. */
+  agentName: string
+  /** Labels usage rows only. The model that answers is the one configured on the agent in Foundry. */
   modelDeployment: string
   graderDeployment: string
-  apiVersion: string
   timeoutMs: number
 }
 
 /** Reads and checks the Foundry settings. Throws a plain Error naming the missing variables. */
 export function getFoundryEnv(): FoundryEnv {
   const endpoint = process.env.FOUNDRY_ENDPOINT
-  const agentId = process.env.FOUNDRY_AGENT_ID
-  const modelDeployment = process.env.FOUNDRY_MODEL_DEPLOYMENT
-  const missing = [
-    !endpoint && 'FOUNDRY_ENDPOINT',
-    !agentId && 'FOUNDRY_AGENT_ID',
-    !modelDeployment && 'FOUNDRY_MODEL_DEPLOYMENT',
-  ].filter(Boolean)
-  if (missing.length > 0 || !endpoint || !agentId || !modelDeployment) {
+  const agentName = process.env.FOUNDRY_AGENT_NAME
+  const missing = [!endpoint && 'FOUNDRY_ENDPOINT', !agentName && 'FOUNDRY_AGENT_NAME'].filter(Boolean)
+  if (missing.length > 0 || !endpoint || !agentName) {
     throw new Error(`Foundry is not configured. Set ${missing.join(', ')} in .env.local (see .env.example).`)
   }
+  const modelDeployment = process.env.FOUNDRY_MODEL_DEPLOYMENT || agentName
   const timeout = Number(process.env.FOUNDRY_API_TIMEOUT_MS)
   return {
     endpoint: endpoint.replace(/\/$/, ''),
-    agentId,
+    agentName,
     modelDeployment,
     graderDeployment: process.env.FOUNDRY_GRADER_DEPLOYMENT || modelDeployment,
-    apiVersion: process.env.FOUNDRY_API_VERSION || DEFAULT_API_VERSION,
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_TIMEOUT_MS,
   }
 }

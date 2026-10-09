@@ -1,14 +1,15 @@
 import { DefaultAzureCredential } from '@azure/identity'
-import { SYSTEM_PROMPT } from './prompts.generated'
 import { getFoundryEnv, type FoundryEnv } from './env'
 import { ContentBlockedError, TransientFoundryError, withTransportRetry } from './retry'
 import type { AgentSession, MessagePart, ToolEvent, TurnOptions, TurnResult } from './types'
 
-// Talks to the Azure AI Foundry Agent Service REST API: one thread per call, deleted afterwards.
-// REST (rather than the preview SDK) keeps this layer small, stable and easy to mock.
+// Talks to an Azure AI Foundry agent through the Responses API on the project endpoint:
+//   POST {project endpoint}/openai/v1/responses   with   agent: { name, type: "agent_reference" }
+// The agent owns its model, instructions (prompts/v1.0/system.md), tools and knowledge base, which are set in the
+// Foundry portal; a request that names an agent must not try to override them, so only `input` is sent.
+// Each session keeps its own message history and resends it, so nothing depends on server-side conversation state.
 
 const TOKEN_SCOPE = 'https://ai.azure.com/.default'
-const REQUEST_TIMEOUT_MS = 30_000
 const POLL_INTERVAL_MS = 1000
 
 let credential: DefaultAzureCredential | null = null
@@ -16,28 +17,29 @@ let credential: DefaultAzureCredential | null = null
 async function authorizationHeader(): Promise<string> {
   credential ??= new DefaultAzureCredential()
   const token = await credential.getToken(TOKEN_SCOPE)
-  if (!token) throw new Error('Could not obtain an Azure access token. Check the AZURE_* settings.')
+  if (!token) throw new Error('Could not obtain an Azure access token. Check the AZURE_* settings or run `az login`.')
   return `Bearer ${token.token}`
 }
 
-interface RunObject {
+interface OutputItem {
+  type: string
+  status?: string
+  role?: string
+  content?: Array<{ type: string; text?: string }>
+}
+
+interface ResponseObject {
   id: string
   status: string
   model?: string
-  usage?: { prompt_tokens?: number; completion_tokens?: number } | null
-  last_error?: { code?: string; message?: string } | null
+  output?: OutputItem[]
+  usage?: { input_tokens?: number; output_tokens?: number } | null
+  error?: { code?: string; message?: string } | null
+  incomplete_details?: { reason?: string } | null
 }
 
-interface MessageObject {
-  role: string
-  run_id?: string | null
-  content: Array<{ type: string; text?: { value?: string } }>
-}
-
-interface StepObject {
-  step_details?: { type?: string; tool_calls?: Array<{ type?: string }> }
-  status?: string
-}
+type InputContent = { type: 'input_text'; text: string } | { type: 'input_image'; image_url: string; detail: 'high' }
+type InputMessage = { role: 'user'; content: InputContent[] } | { role: 'assistant'; content: string }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -47,20 +49,34 @@ function retryAfterMs(response: Response): number | undefined {
   return Number.isFinite(seconds) ? seconds * 1000 : undefined
 }
 
+function replyText(response: ResponseObject): string {
+  return (response.output ?? [])
+    .filter((item) => item.type === 'message' && item.role !== 'user')
+    .flatMap((item) => item.content ?? [])
+    .filter((block) => block.type === 'output_text')
+    .map((block) => block.text ?? '')
+    .join('\n')
+    .trim()
+}
+
+function toolEventsOf(response: ResponseObject): ToolEvent[] {
+  return (response.output ?? [])
+    .filter((item) => item.type.endsWith('_call'))
+    .map((item) => ({ tool: item.type.replace(/_call$/, ''), status: item.status ?? 'unknown' }))
+}
+
 class RestSession implements AgentSession {
-  private threadId: string | null = null
+  private readonly history: InputMessage[] = []
 
   constructor(private readonly env: FoundryEnv) {}
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const separator = path.includes('?') ? '&' : '?'
-    const url = `${this.env.endpoint}${path}${separator}api-version=${encodeURIComponent(this.env.apiVersion)}`
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), this.env.timeoutMs)
 
     let response: Response
     try {
-      response = await fetch(url, {
+      response = await fetch(`${this.env.endpoint}${path}`, {
         method,
         headers: { Authorization: await authorizationHeader(), 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -88,109 +104,65 @@ class RestSession implements AgentSession {
     return (await response.json()) as T
   }
 
-  private async ensureThread(): Promise<string> {
-    if (this.threadId) return this.threadId
-    const thread = await withTransportRetry(() => this.request<{ id: string }>('POST', '/threads', {}))
-    this.threadId = thread.id
-    return thread.id
-  }
-
-  private toContent(parts: MessagePart[]) {
+  private toContent(parts: MessagePart[]): InputContent[] {
     return parts.map((part) =>
       part.type === 'text'
-        ? { type: 'text', text: part.text }
-        : { type: 'image_url', image_url: { url: part.url, detail: 'high' } },
+        ? { type: 'input_text', text: part.text }
+        : { type: 'input_image', image_url: part.url, detail: 'high' },
     )
   }
 
-  private async executeRun(threadId: string, options: TurnOptions): Promise<RunObject> {
-    const created = await this.request<RunObject>('POST', `/threads/${threadId}/runs`, {
-      assistant_id: this.env.agentId,
-      model: options.model,
-      // The repository is the source of truth for instructions; they are sent on every run.
-      instructions: SYSTEM_PROMPT,
-      temperature: options.temperature,
-      max_completion_tokens: options.maxOutputTokens,
-      tools: options.tools.map((tool) => ({ type: tool })),
+  private async createResponse(): Promise<ResponseObject> {
+    const created = await this.request<ResponseObject>('POST', '/openai/v1/responses', {
+      input: this.history,
+      agent: { name: this.env.agentName, type: 'agent_reference' },
     })
 
     const deadline = Date.now() + this.env.timeoutMs
-    let run = created
-    while (run.status === 'queued' || run.status === 'in_progress' || run.status === 'cancelling') {
+    let current = created
+    while (current.status === 'queued' || current.status === 'in_progress') {
       if (Date.now() > deadline) {
-        await this.request('POST', `/threads/${threadId}/runs/${run.id}/cancel`, {}).catch(() => undefined)
-        throw new TransientFoundryError('Foundry run timed out')
+        await this.request('POST', `/openai/v1/responses/${current.id}/cancel`, {}).catch(() => undefined)
+        throw new TransientFoundryError('Foundry response timed out')
       }
       await sleep(POLL_INTERVAL_MS)
-      run = await this.request<RunObject>('GET', `/threads/${threadId}/runs/${run.id}`)
+      current = await this.request<ResponseObject>('GET', `/openai/v1/responses/${current.id}`)
     }
 
-    if (run.status === 'completed') return run
-    if (run.status === 'failed') {
-      const code = run.last_error?.code ?? ''
-      if (/content_filter/i.test(code)) throw new ContentBlockedError(run.last_error?.message ?? 'Content filtered')
-      if (/rate_limit|server_error|timeout/i.test(code)) {
-        throw new TransientFoundryError(`Foundry run failed: ${code}`)
-      }
-      throw new Error(`Foundry run failed: ${code} ${run.last_error?.message ?? ''}`.trim())
+    if (current.status === 'completed') return current
+    if (current.status === 'failed') {
+      const code = current.error?.code ?? ''
+      if (/content_filter/i.test(code)) throw new ContentBlockedError(current.error?.message ?? 'Content filtered')
+      if (/rate_limit|server_error|timeout/i.test(code)) throw new TransientFoundryError(`Foundry response failed: ${code}`)
+      throw new Error(`Foundry response failed: ${code} ${current.error?.message ?? ''}`.trim())
     }
-    if (run.status === 'cancelled' || run.status === 'expired') {
-      throw new TransientFoundryError(`Foundry run ${run.status}`)
+    if (current.status === 'incomplete' && /content_filter/i.test(current.incomplete_details?.reason ?? '')) {
+      throw new ContentBlockedError('Content was blocked by the safety filter')
     }
-    throw new Error(`Foundry run ended in unexpected status "${run.status}"`)
+    if (current.status === 'cancelled') throw new TransientFoundryError('Foundry response was cancelled')
+    throw new Error(`Foundry response ended in unexpected status "${current.status}"`)
   }
 
+  // Temperature, output cap, tools and model are the agent's own settings, so TurnOptions is not sent.
   async send(parts: MessagePart[], options: TurnOptions): Promise<TurnResult> {
-    const threadId = await this.ensureThread()
+    this.history.push({ role: 'user', content: this.toContent(parts) })
+    const response = await withTransportRetry(() => this.createResponse())
+    const text = replyText(response)
+    this.history.push({ role: 'assistant', content: text })
 
-    await withTransportRetry(() =>
-      this.request('POST', `/threads/${threadId}/messages`, { role: 'user', content: this.toContent(parts) }),
-    )
-    const run = await withTransportRetry(() => this.executeRun(threadId, options))
-
-    const messages = await withTransportRetry(() =>
-      this.request<{ data: MessageObject[] }>('GET', `/threads/${threadId}/messages?order=desc&limit=10`),
-    )
-    const reply = messages.data.find((message) => message.role === 'assistant' && message.run_id === run.id)
-    const text = (reply?.content ?? [])
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text?.value ?? '')
-      .join('\n')
-      .trim()
-
-    // Tool use is informational (cost + diagnostics); failing to read it must not fail the call.
-    let toolEvents: ToolEvent[] = []
-    try {
-      const steps = await this.request<{ data: StepObject[] }>('GET', `/threads/${threadId}/runs/${run.id}/steps`)
-      toolEvents = steps.data.flatMap((step) =>
-        (step.step_details?.tool_calls ?? []).map((call) => ({
-          tool: call.type ?? 'unknown',
-          status: step.status ?? 'unknown',
-        })),
-      )
-    } catch {
-      toolEvents = []
-    }
-
+    const toolEvents = toolEventsOf(response)
     return {
       text,
-      inputTokens: run.usage?.prompt_tokens ?? 0,
-      outputTokens: run.usage?.completion_tokens ?? 0,
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
       codeInterpreterSessions: toolEvents.some((event) => event.tool === 'code_interpreter') ? 1 : 0,
       toolEvents,
-      model: run.model ?? options.model,
+      model: response.model ?? options.model,
     }
   }
 
   async close(): Promise<void> {
-    if (!this.threadId) return
-    const id = this.threadId
-    this.threadId = null
-    try {
-      await this.request('DELETE', `/threads/${id}`)
-    } catch {
-      // A leftover thread is harmless; a weekly script removes threads older than 24 hours (spec 05 §8).
-    }
+    // Nothing to release: the history lives in this object.
   }
 }
 

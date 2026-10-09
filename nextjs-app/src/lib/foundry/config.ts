@@ -30,5 +30,4 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
 
 export const RETRY_DELAYS_MS = [1000, 3000, 8000] as const
 export const MAX_TRANSPORT_ATTEMPTS = 3
-export const DEFAULT_API_VERSION = '2025-05-01'
 export const DEFAULT_TIMEOUT_MS = 120_000
